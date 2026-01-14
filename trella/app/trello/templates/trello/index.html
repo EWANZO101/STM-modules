@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Boards - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Boards</h1>
+            <p class="text-gray-500 mt-1">Organize your projects with Kanban boards</p>
+        </div>
+        <a href="{{ url_for('trello.create_board') }}" 
+           class="px-5 py-2.5 bg-gradient-to-r from-{{ primary_color }}-500 to-{{ primary_color }}-600 hover:from-{{ primary_color }}-400 hover:to-{{ primary_color }}-500 text-white font-medium rounded-xl shadow-lg shadow-{{ primary_color }}-500/25 transition-all duration-200 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Board
+        </a>
+    </div>
+</div>
+
+<!-- My Boards -->
+{% if my_boards %}
+<div class="mb-10">
+    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5 text-{{ primary_color }}-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        My Boards
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for board in my_boards %}
+        <a href="{{ url_for('trello.view_board', id=board.id) }}" 
+           class="group relative h-32 bg-gradient-to-br from-{{ board.background_color }}-600 to-{{ board.background_color }}-800 rounded-xl p-4 hover:shadow-xl hover:shadow-{{ board.background_color }}-500/20 transition-all duration-300 overflow-hidden">
+            <div class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+            <div class="relative z-10">
+                <h3 class="font-semibold text-white text-lg mb-1">{{ board.name }}</h3>
+                {% if board.description %}
+                <p class="text-white/70 text-sm line-clamp-2">{{ board.description }}</p>
+                {% endif %}
+            </div>
+            {% if board.is_private %}
+            <div class="absolute top-3 right-3 z-10">
+                <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+            </div>
+            {% endif %}
+            <div class="absolute bottom-3 right-3 z-10 flex items-center gap-2 text-white/60 text-xs">
+                <span>{{ board.lists.count() }} lists</span>
+            </div>
+        </a>
+        {% endfor %}
+        
+        <!-- Create New Board Card -->
+        <a href="{{ url_for('trello.create_board') }}" 
+           class="group h-32 bg-dark-800/50 hover:bg-dark-700/50 border-2 border-dashed border-dark-600 hover:border-{{ primary_color }}-500/50 rounded-xl p-4 flex flex-col items-center justify-center transition-all duration-300">
+            <svg class="w-8 h-8 text-gray-500 group-hover:text-{{ primary_color }}-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span class="text-gray-500 group-hover:text-gray-300 text-sm mt-2 transition-colors">Create new board</span>
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Member Boards -->
+{% if member_boards %}
+<div class="mb-10">
+    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        Shared With Me
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for board in member_boards %}
+        <a href="{{ url_for('trello.view_board', id=board.id) }}" 
+           class="group relative h-32 bg-gradient-to-br from-{{ board.background_color }}-600 to-{{ board.background_color }}-800 rounded-xl p-4 hover:shadow-xl hover:shadow-{{ board.background_color }}-500/20 transition-all duration-300 overflow-hidden">
+            <div class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+            <div class="relative z-10">
+                <h3 class="font-semibold text-white text-lg mb-1">{{ board.name }}</h3>
+                <p class="text-white/60 text-xs">by {{ board.creator.name if board.creator else 'Unknown' }}</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Public Boards -->
+{% if public_boards %}
+<div class="mb-10">
+    <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/>
+        </svg>
+        Public Boards
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {% for board in public_boards %}
+        <a href="{{ url_for('trello.view_board', id=board.id) }}" 
+           class="group relative h-32 bg-gradient-to-br from-{{ board.background_color }}-600 to-{{ board.background_color }}-800 rounded-xl p-4 hover:shadow-xl hover:shadow-{{ board.background_color }}-500/20 transition-all duration-300 overflow-hidden">
+            <div class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+            <div class="relative z-10">
+                <h3 class="font-semibold text-white text-lg mb-1">{{ board.name }}</h3>
+                <p class="text-white/60 text-xs">by {{ board.creator.name if board.creator else 'Unknown' }}</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Empty State -->
+{% if not my_boards and not member_boards and not public_boards %}
+<div class="bg-dark-800/50 backdrop-blur border border-dark-700/50 rounded-2xl p-12 text-center">
+    <div class="w-20 h-20 bg-dark-700 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <svg class="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+        </svg>
+    </div>
+    <h3 class="text-xl font-semibold mb-2">No boards yet</h3>
+    <p class="text-gray-500 mb-6">Create your first board to start organizing your projects</p>
+    <a href="{{ url_for('trello.create_board') }}" 
+       class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-{{ primary_color }}-500 to-{{ primary_color }}-600 hover:from-{{ primary_color }}-400 hover:to-{{ primary_color }}-500 text-white font-medium rounded-xl shadow-lg shadow-{{ primary_color }}-500/25 transition-all">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create Your First Board
+    </a>
+</div>
+{% endif %}
+{% endblock %}

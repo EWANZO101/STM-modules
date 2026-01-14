@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Create Board - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <a href="{{ url_for('trello.index') }}" class="text-gray-500 hover:text-gray-300 text-sm mb-2 inline-flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to Boards
+    </a>
+    <h1 class="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Create Board</h1>
+    <p class="text-gray-500 mt-1">Start a new project board</p>
+</div>
+
+<form method="POST" class="max-w-2xl">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    
+    <div class="bg-dark-800/50 backdrop-blur border border-dark-700/50 rounded-2xl p-6 space-y-6">
+        <!-- Board Name -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Board Name *</label>
+            <input type="text" name="name" required autofocus
+                class="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl focus:outline-none focus:border-{{ primary_color }}-500 focus:ring-1 focus:ring-{{ primary_color }}-500/50 transition-colors"
+                placeholder="My Project Board">
+        </div>
+        
+        <!-- Description -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
+            <textarea name="description" rows="3"
+                class="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl focus:outline-none focus:border-{{ primary_color }}-500 focus:ring-1 focus:ring-{{ primary_color }}-500/50 transition-colors resize-none"
+                placeholder="What is this board for?"></textarea>
+        </div>
+        
+        <!-- Background Color -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-3">Background Color</label>
+            <div class="grid grid-cols-5 md:grid-cols-10 gap-2">
+                {% for color in ['slate', 'gray', 'zinc', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'] %}
+                <label class="relative cursor-pointer">
+                    <input type="radio" name="background_color" value="{{ color }}" class="peer sr-only" {% if color == 'slate' %}checked{% endif %}>
+                    <div class="w-10 h-10 bg-gradient-to-br from-{{ color }}-500 to-{{ color }}-700 rounded-lg peer-checked:ring-2 peer-checked:ring-white peer-checked:ring-offset-2 peer-checked:ring-offset-dark-800 transition-all hover:scale-110"></div>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Visibility -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-3">Visibility</label>
+            <div class="flex gap-4">
+                <label class="flex items-center gap-3 p-4 bg-dark-700/50 rounded-xl cursor-pointer hover:bg-dark-700 transition-colors flex-1">
+                    <input type="radio" name="visibility" value="public" checked class="w-4 h-4 text-{{ primary_color }}-500 bg-dark-600 border-dark-500 focus:ring-{{ primary_color }}-500">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064"/>
+                            </svg>
+                            <span class="font-medium">Public</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Visible to all team members</p>
+                    </div>
+                </label>
+                
+                <label class="flex items-center gap-3 p-4 bg-dark-700/50 rounded-xl cursor-pointer hover:bg-dark-700 transition-colors flex-1">
+                    <input type="radio" name="visibility" value="private" class="w-4 h-4 text-{{ primary_color }}-500 bg-dark-600 border-dark-500 focus:ring-{{ primary_color }}-500"
+                           onclick="document.querySelector('input[name=is_private]').checked = true">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                            <span class="font-medium">Private</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Only visible to board members</p>
+                    </div>
+                </label>
+            </div>
+            <input type="checkbox" name="is_private" class="hidden">
+        </div>
+    </div>
+    
+    <!-- Preview -->
+    <div class="mt-6 p-4 bg-dark-800/30 rounded-xl border border-dark-700/50">
+        <p class="text-xs text-gray-500 uppercase tracking-wider mb-3">Preview</p>
+        <div id="boardPreview" class="h-24 bg-gradient-to-br from-slate-600 to-slate-800 rounded-xl p-4 transition-all duration-300">
+            <p id="previewName" class="font-semibold text-white">My Project Board</p>
+        </div>
+    </div>
+    
+    <div class="mt-6 flex gap-3">
+        <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-{{ primary_color }}-500 to-{{ primary_color }}-600 hover:from-{{ primary_color }}-400 hover:to-{{ primary_color }}-500 text-white font-medium rounded-xl shadow-lg shadow-{{ primary_color }}-500/25 transition-all">
+            Create Board
+        </button>
+        <a href="{{ url_for('trello.index') }}" class="px-6 py-2.5 bg-dark-700 hover:bg-dark-600 rounded-xl font-medium transition-colors">
+            Cancel
+        </a>
+    </div>
+</form>
+
+<script>
+// Live preview
+const nameInput = document.querySelector('input[name="name"]');
+const colorInputs = document.querySelectorAll('input[name="background_color"]');
+const preview = document.getElementById('boardPreview');
+const previewName = document.getElementById('previewName');
+
+nameInput.addEventListener('input', () => {
+    previewName.textContent = nameInput.value || 'My Project Board';
+});
+
+colorInputs.forEach(input => {
+    input.addEventListener('change', () => {
+        const color = input.value;
+        preview.className = `h-24 bg-gradient-to-br from-${color}-600 to-${color}-800 rounded-xl p-4 transition-all duration-300`;
+    });
+});
+
+// Handle visibility toggle
+document.querySelectorAll('input[name="visibility"]').forEach(input => {
+    input.addEventListener('change', () => {
+        document.querySelector('input[name="is_private"]').checked = input.value === 'private';
+    });
+});
+</script>
+{% endblock %}

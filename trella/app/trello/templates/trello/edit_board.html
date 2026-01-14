@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ board.name }} - {{ site_name }}{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <a href="{{ url_for('trello.view_board', id=board.id) }}" class="text-gray-500 hover:text-gray-300 text-sm mb-2 inline-flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to Board
+    </a>
+    <h1 class="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Board Settings</h1>
+    <p class="text-gray-500 mt-1">Configure your board</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Settings -->
+    <div class="lg:col-span-2">
+        <form method="POST" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <div class="bg-dark-800/50 backdrop-blur border border-dark-700/50 rounded-2xl p-6 space-y-6">
+                <h2 class="text-lg font-semibold">Board Details</h2>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Board Name *</label>
+                    <input type="text" name="name" value="{{ board.name }}" required
+                        class="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl focus:outline-none focus:border-{{ primary_color }}-500 focus:ring-1 focus:ring-{{ primary_color }}-500/50 transition-colors">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                    <textarea name="description" rows="3"
+                        class="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl focus:outline-none focus:border-{{ primary_color }}-500 focus:ring-1 focus:ring-{{ primary_color }}-500/50 transition-colors resize-none">{{ board.description or '' }}</textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-3">Background Color</label>
+                    <div class="grid grid-cols-5 md:grid-cols-10 gap-2">
+                        {% for color in ['slate', 'gray', 'zinc', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'] %}
+                        <label class="relative cursor-pointer">
+                            <input type="radio" name="background_color" value="{{ color }}" class="peer sr-only" {% if board.background_color == color %}checked{% endif %}>
+                            <div class="w-10 h-10 bg-gradient-to-br from-{{ color }}-500 to-{{ color }}-700 rounded-lg peer-checked:ring-2 peer-checked:ring-white peer-checked:ring-offset-2 peer-checked:ring-offset-dark-800 transition-all hover:scale-110"></div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="flex items-center gap-3 p-4 bg-dark-700/50 rounded-xl cursor-pointer hover:bg-dark-700 transition-colors">
+                        <input type="checkbox" name="is_private" {% if board.is_private %}checked{% endif %}
+                            class="w-4 h-4 text-{{ primary_color }}-500 bg-dark-600 border-dark-500 rounded focus:ring-{{ primary_color }}-500">
+                        <div>
+                            <span class="font-medium">Private Board</span>
+                            <p class="text-xs text-gray-500 mt-1">Only visible to board members</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button type="submit" class="px-6 py-2.5 bg-gradient-to-r from-{{ primary_color }}-500 to-{{ primary_color }}-600 hover:from-{{ primary_color }}-400 hover:to-{{ primary_color }}-500 text-white font-medium rounded-xl shadow-lg shadow-{{ primary_color }}-500/25 transition-all">
+                    Save Changes
+                </button>
+                <a href="{{ url_for('trello.view_board', id=board.id) }}" class="px-6 py-2.5 bg-dark-700 hover:bg-dark-600 rounded-xl font-medium transition-colors">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Labels -->
+        <div class="bg-dark-800/50 backdrop-blur border border-dark-700/50 rounded-2xl p-6">
+            <h2 class="text-lg font-semibold mb-4">Labels</h2>
+            <div class="space-y-2">
+                {% for label in board.labels %}
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-6 bg-{{ label.color }}-500 rounded"></div>
+                    <span class="text-sm flex-1">{{ label.name or '(no name)' }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Members -->
+        <div class="bg-dark-800/50 backdrop-blur border border-dark-700/50 rounded-2xl p-6">
+            <h2 class="text-lg font-semibold mb-4">Members ({{ board.members|length }})</h2>
+            <div class="space-y-3">
+                <!-- Owner -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-{{ primary_color }}-400 to-{{ primary_color }}-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
+                        {{ board.creator.name[0] if board.creator else '?' }}
+                    </div>
+                    <div>
+                        <p class="font-medium">{{ board.creator.name if board.creator else 'Unknown' }}</p>
+                        <p class="text-xs text-gray-500">Owner</p>
+                    </div>
+                </div>
+                
+                {% for member in board.members %}
+                {% if member.id != board.created_by %}
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-sm font-bold text-white">
+                        {{ member.name[0] }}
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-medium">{{ member.name }}</p>
+                        <p class="text-xs text-gray-500">{{ board.get_member_role(member.id) }}</p>
+                    </div>
+                    <form method="POST" action="{{ url_for('trello.remove_board_member', id=board.id, user_id=member.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="text-red-400 hover:text-red-300 text-xs" onclick="return confirm('Remove this member?')">
+                            Remove
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Danger Zone -->
+        <div class="bg-red-500/10 border border-red-500/20 rounded-2xl p-6">
+            <h2 class="text-lg font-semibold text-red-400 mb-4">Danger Zone</h2>
+            
+            <form method="POST" action="{{ url_for('trello.archive_board', id=board.id) }}" class="mb-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="w-full px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-xl text-sm transition-colors" onclick="return confirm('Archive this board?')">
+                    Archive Board
+                </button>
+            </form>
+            
+            <form method="POST" action="{{ url_for('trello.delete_board', id=board.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm transition-colors" onclick="return confirm('PERMANENTLY DELETE this board and all cards? This cannot be undone!')">
+                    Delete Board
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

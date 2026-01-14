@@ -1,0 +1,725 @@
+{% extends "base.html" %}
+{% block title %}{{ board.name }} - {{ site_name }}{% endblock %}
+
+{% block content %}
+<!-- Board Header -->
+<div class="mb-6">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <a href="{{ url_for('trello.index') }}" class="p-2 hover:bg-dark-700 rounded-lg transition-colors">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold">{{ board.name }}</h1>
+                {% if board.description %}
+                <p class="text-gray-500 text-sm">{{ board.description }}</p>
+                {% endif %}
+            </div>
+            {% if board.is_private %}
+            <span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-lg flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+                Private
+            </span>
+            {% endif %}
+        </div>
+        
+        <div class="flex items-center gap-2">
+            <!-- Members -->
+            <div class="flex -space-x-2 mr-4">
+                {% for member in board.members[:5] %}
+                <div class="w-8 h-8 bg-gradient-to-br from-{{ primary_color }}-400 to-{{ primary_color }}-600 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-dark-800" title="{{ member.name }}">
+                    {{ member.name[0] }}
+                </div>
+                {% endfor %}
+                {% if board.members|length > 5 %}
+                <div class="w-8 h-8 bg-dark-600 rounded-full flex items-center justify-center text-xs text-gray-400 border-2 border-dark-800">
+                    +{{ board.members|length - 5 }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Actions -->
+            <button onclick="toggleActivityPanel()" class="p-2 hover:bg-dark-700 rounded-lg transition-colors" title="Activity">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </button>
+            
+            {% if board.is_owner(current_user.id) %}
+            <a href="{{ url_for('trello.edit_board', id=board.id) }}" class="p-2 hover:bg-dark-700 rounded-lg transition-colors" title="Settings">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Board Content -->
+<div class="flex gap-4 overflow-x-auto pb-4 min-h-[calc(100vh-200px)]" id="boardLists">
+    {% for list in lists %}
+    <div class="flex-shrink-0 w-72 bg-dark-800/80 backdrop-blur rounded-xl border border-dark-700/50" data-list-id="{{ list.id }}">
+        <!-- List Header -->
+        <div class="p-3 border-b border-dark-700/50 flex items-center justify-between">
+            <h3 class="font-semibold text-sm list-name" contenteditable="true" 
+                data-list-id="{{ list.id }}"
+                onblur="renameList({{ list.id }}, this.textContent)">{{ list.name }}</h3>
+            <div class="flex items-center gap-1">
+                <span class="text-xs text-gray-500">{{ list.cards.filter_by(is_archived=False).count() }}</span>
+                <button onclick="archiveList({{ list.id }})" class="p-1 hover:bg-dark-600 rounded transition-colors" title="Archive list">
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Cards Container -->
+        <div class="p-2 space-y-2 min-h-[100px] cards-container" data-list-id="{{ list.id }}">
+            {% for card in list.cards.filter_by(is_archived=False).order_by('position') %}
+            <div class="card bg-dark-700 hover:bg-dark-600 rounded-lg p-3 cursor-pointer shadow-sm hover:shadow-md transition-all group"
+                 data-card-id="{{ card.id }}"
+                 onclick="openCardModal({{ card.id }})">
+                
+                <!-- Cover -->
+                {% if card.cover_color %}
+                <div class="h-8 -mx-3 -mt-3 mb-2 rounded-t-lg bg-{{ card.cover_color }}-500"></div>
+                {% endif %}
+                
+                <!-- Labels -->
+                {% if card.labels %}
+                <div class="flex flex-wrap gap-1 mb-2">
+                    {% for label in card.labels %}
+                    <span class="h-2 w-8 rounded-full bg-{{ label.color }}-500" title="{{ label.name }}"></span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <!-- Title -->
+                <p class="text-sm font-medium">{{ card.title }}</p>
+                
+                <!-- Card Meta -->
+                <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                    {% if card.due_date %}
+                    <span class="flex items-center gap-1 px-1.5 py-0.5 rounded {% if card.is_overdue %}bg-red-500/20 text-red-400{% elif card.due_complete %}bg-green-500/20 text-green-400{% else %}bg-dark-600{% endif %}">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        {{ card.due_date.strftime('%b %d') }}
+                    </span>
+                    {% endif %}
+                    
+                    {% if card.description %}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                    </svg>
+                    {% endif %}
+                    
+                    {% if card.comments.count() > 0 %}
+                    <span class="flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                        {{ card.comments.count() }}
+                    </span>
+                    {% endif %}
+                    
+                    {% set progress = card.checklist_progress %}
+                    {% if progress[1] > 0 %}
+                    <span class="flex items-center gap-1 {% if progress[0] == progress[1] %}text-green-400{% endif %}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                        </svg>
+                        {{ progress[0] }}/{{ progress[1] }}
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <!-- Members -->
+                {% if card.members %}
+                <div class="flex -space-x-1 mt-2 justify-end">
+                    {% for member in card.members[:3] %}
+                    <div class="w-6 h-6 bg-gradient-to-br from-{{ primary_color }}-400 to-{{ primary_color }}-600 rounded-full flex items-center justify-center text-[10px] font-bold text-white border border-dark-700" title="{{ member.name }}">
+                        {{ member.name[0] }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Add Card Button -->
+        <div class="p-2 border-t border-dark-700/50">
+            <button onclick="showAddCard({{ list.id }})" class="w-full p-2 text-left text-sm text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg transition-colors flex items-center gap-2 add-card-btn" data-list-id="{{ list.id }}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Add a card
+            </button>
+            <form class="hidden add-card-form" data-list-id="{{ list.id }}" onsubmit="createCard(event, {{ list.id }})">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <textarea name="title" rows="2" placeholder="Enter card title..." 
+                    class="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-sm focus:outline-none focus:border-{{ primary_color }}-500 resize-none mb-2"></textarea>
+                <div class="flex gap-2">
+                    <button type="submit" class="px-3 py-1.5 bg-{{ primary_color }}-600 hover:bg-{{ primary_color }}-500 text-white text-sm rounded-lg transition-colors">
+                        Add Card
+                    </button>
+                    <button type="button" onclick="hideAddCard({{ list.id }})" class="px-3 py-1.5 hover:bg-dark-600 text-gray-400 text-sm rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+    
+    <!-- Add List Button -->
+    <div class="flex-shrink-0 w-72">
+        <button onclick="showAddList()" id="addListBtn" class="w-full p-3 bg-dark-800/50 hover:bg-dark-800 border border-dark-700/50 hover:border-dark-600 rounded-xl text-gray-400 hover:text-white transition-all flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add another list
+        </button>
+        <form id="addListForm" class="hidden bg-dark-800/80 backdrop-blur rounded-xl border border-dark-700/50 p-3" onsubmit="createList(event)">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="name" placeholder="Enter list title..." 
+                class="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-sm focus:outline-none focus:border-{{ primary_color }}-500 mb-2">
+            <div class="flex gap-2">
+                <button type="submit" class="px-3 py-1.5 bg-{{ primary_color }}-600 hover:bg-{{ primary_color }}-500 text-white text-sm rounded-lg transition-colors">
+                    Add List
+                </button>
+                <button type="button" onclick="hideAddList()" class="px-3 py-1.5 hover:bg-dark-600 text-gray-400 text-sm rounded-lg transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Card Modal -->
+<div id="cardModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-start justify-center pt-16 overflow-y-auto">
+    <div class="bg-dark-800 rounded-2xl border border-dark-700 w-full max-w-2xl mx-4 mb-8 shadow-2xl">
+        <!-- Modal Header -->
+        <div class="p-6 border-b border-dark-700">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <input type="text" id="cardTitle" class="text-xl font-semibold bg-transparent border-none focus:outline-none focus:bg-dark-700 rounded-lg px-2 -ml-2 w-full" onchange="updateCardTitle()">
+                    <p class="text-sm text-gray-500 mt-1 px-2">in list <span id="cardListName" class="text-gray-400"></span></p>
+                </div>
+                <button onclick="closeCardModal()" class="p-2 hover:bg-dark-700 rounded-lg transition-colors">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Modal Body -->
+        <div class="p-6 grid grid-cols-3 gap-6">
+            <!-- Main Content -->
+            <div class="col-span-2 space-y-6">
+                <!-- Labels -->
+                <div id="cardLabels" class="hidden">
+                    <h4 class="text-sm font-medium text-gray-400 mb-2">Labels</h4>
+                    <div class="flex flex-wrap gap-2" id="cardLabelsList"></div>
+                </div>
+                
+                <!-- Members -->
+                <div id="cardMembers" class="hidden">
+                    <h4 class="text-sm font-medium text-gray-400 mb-2">Members</h4>
+                    <div class="flex flex-wrap gap-2" id="cardMembersList"></div>
+                </div>
+                
+                <!-- Due Date -->
+                <div id="cardDueDate" class="hidden">
+                    <h4 class="text-sm font-medium text-gray-400 mb-2">Due Date</h4>
+                    <div id="cardDueDateValue" class="text-sm"></div>
+                </div>
+                
+                <!-- Description -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                        </svg>
+                        Description
+                    </h4>
+                    <textarea id="cardDescription" rows="4" placeholder="Add a more detailed description..."
+                        class="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-sm focus:outline-none focus:border-{{ primary_color }}-500 resize-none"
+                        onchange="updateCardDescription()"></textarea>
+                </div>
+                
+                <!-- Checklists -->
+                <div id="cardChecklists">
+                    <div id="checklistsContainer"></div>
+                </div>
+                
+                <!-- Comments -->
+                <div>
+                    <h4 class="text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                        Activity
+                    </h4>
+                    <div class="flex gap-3 mb-4">
+                        <div class="w-8 h-8 bg-gradient-to-br from-{{ primary_color }}-400 to-{{ primary_color }}-600 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                            {{ current_user.name[0] }}
+                        </div>
+                        <div class="flex-1">
+                            <textarea id="newComment" rows="2" placeholder="Write a comment..."
+                                class="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-sm focus:outline-none focus:border-{{ primary_color }}-500 resize-none"></textarea>
+                            <button onclick="addComment()" class="mt-2 px-3 py-1.5 bg-{{ primary_color }}-600 hover:bg-{{ primary_color }}-500 text-white text-sm rounded-lg transition-colors">
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                    <div id="commentsContainer" class="space-y-3"></div>
+                </div>
+            </div>
+            
+            <!-- Sidebar Actions -->
+            <div class="space-y-2">
+                <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Add to card</p>
+                
+                <button onclick="toggleLabelsDropdown()" class="w-full p-2 text-left text-sm text-gray-300 hover:bg-dark-700 rounded-lg transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                    Labels
+                </button>
+                
+                <button onclick="toggleMembersDropdown()" class="w-full p-2 text-left text-sm text-gray-300 hover:bg-dark-700 rounded-lg transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    Members
+                </button>
+                
+                <button onclick="addChecklist()" class="w-full p-2 text-left text-sm text-gray-300 hover:bg-dark-700 rounded-lg transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                    Checklist
+                </button>
+                
+                <button onclick="toggleDueDatePicker()" class="w-full p-2 text-left text-sm text-gray-300 hover:bg-dark-700 rounded-lg transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Due Date
+                </button>
+                
+                <button onclick="toggleCoverPicker()" class="w-full p-2 text-left text-sm text-gray-300 hover:bg-dark-700 rounded-lg transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Cover
+                </button>
+                
+                <p class="text-xs text-gray-500 uppercase tracking-wider mt-4 mb-2">Actions</p>
+                
+                <button onclick="moveCard()" class="w-full p-2 text-left text-sm text-gray-300 hover:bg-dark-700 rounded-lg transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                    Move
+                </button>
+                
+                <button onclick="archiveCard()" class="w-full p-2 text-left text-sm text-gray-300 hover:bg-dark-700 rounded-lg transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                    </svg>
+                    Archive
+                </button>
+                
+                <button onclick="deleteCard()" class="w-full p-2 text-left text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Panel -->
+<div id="activityPanel" class="fixed right-0 top-0 h-full w-80 bg-dark-800 border-l border-dark-700 transform translate-x-full transition-transform z-40 hidden">
+    <div class="p-4 border-b border-dark-700 flex items-center justify-between">
+        <h3 class="font-semibold">Activity</h3>
+        <button onclick="toggleActivityPanel()" class="p-1 hover:bg-dark-700 rounded-lg">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </div>
+    <div id="activityList" class="p-4 space-y-4 overflow-y-auto h-[calc(100%-60px)]"></div>
+</div>
+
+<script>
+const boardId = {{ board.id }};
+const csrfToken = '{{ csrf_token() }}';
+let currentCardId = null;
+let currentCardData = null;
+
+// List functions
+function showAddList() {
+    document.getElementById('addListBtn').classList.add('hidden');
+    document.getElementById('addListForm').classList.remove('hidden');
+    document.querySelector('#addListForm input[name="name"]').focus();
+}
+
+function hideAddList() {
+    document.getElementById('addListBtn').classList.remove('hidden');
+    document.getElementById('addListForm').classList.add('hidden');
+}
+
+async function createList(e) {
+    e.preventDefault();
+    const form = e.target;
+    const name = form.name.value.trim();
+    if (!name) return;
+    
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('csrf_token', csrfToken);
+    
+    const response = await fetch(`/trello/board/${boardId}/list/create`, {
+        method: 'POST',
+        body: formData
+    });
+    
+    if (response.ok) {
+        location.reload();
+    }
+}
+
+async function renameList(listId, name) {
+    const formData = new FormData();
+    formData.append('name', name.trim());
+    formData.append('csrf_token', csrfToken);
+    
+    await fetch(`/trello/list/${listId}/rename`, {
+        method: 'POST',
+        body: formData
+    });
+}
+
+async function archiveList(listId) {
+    if (!confirm('Archive this list?')) return;
+    
+    await fetch(`/trello/list/${listId}/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf_token: csrfToken })
+    });
+    
+    location.reload();
+}
+
+// Card functions
+function showAddCard(listId) {
+    document.querySelector(`.add-card-btn[data-list-id="${listId}"]`).classList.add('hidden');
+    document.querySelector(`.add-card-form[data-list-id="${listId}"]`).classList.remove('hidden');
+    document.querySelector(`.add-card-form[data-list-id="${listId}"] textarea`).focus();
+}
+
+function hideAddCard(listId) {
+    document.querySelector(`.add-card-btn[data-list-id="${listId}"]`).classList.remove('hidden');
+    document.querySelector(`.add-card-form[data-list-id="${listId}"]`).classList.add('hidden');
+}
+
+async function createCard(e, listId) {
+    e.preventDefault();
+    const form = e.target;
+    const title = form.title.value.trim();
+    if (!title) return;
+    
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('csrf_token', csrfToken);
+    
+    const response = await fetch(`/trello/list/${listId}/card/create`, {
+        method: 'POST',
+        body: formData
+    });
+    
+    if (response.ok) {
+        location.reload();
+    }
+}
+
+// Card Modal
+async function openCardModal(cardId) {
+    currentCardId = cardId;
+    
+    const response = await fetch(`/trello/card/${cardId}`);
+    const data = await response.json();
+    currentCardData = data;
+    
+    document.getElementById('cardTitle').value = data.title;
+    document.getElementById('cardListName').textContent = data.list_name;
+    document.getElementById('cardDescription').value = data.description || '';
+    
+    // Labels
+    const labelsDiv = document.getElementById('cardLabels');
+    const labelsList = document.getElementById('cardLabelsList');
+    if (data.labels && data.labels.length > 0) {
+        labelsDiv.classList.remove('hidden');
+        labelsList.innerHTML = data.labels.map(l => 
+            `<span class="px-2 py-1 bg-${l.color}-500 text-white text-xs rounded">${l.name || l.color}</span>`
+        ).join('');
+    } else {
+        labelsDiv.classList.add('hidden');
+    }
+    
+    // Members
+    const membersDiv = document.getElementById('cardMembers');
+    const membersList = document.getElementById('cardMembersList');
+    if (data.members && data.members.length > 0) {
+        membersDiv.classList.remove('hidden');
+        membersList.innerHTML = data.members.map(m => 
+            `<div class="w-8 h-8 bg-gradient-to-br from-{{ primary_color }}-400 to-{{ primary_color }}-600 rounded-full flex items-center justify-center text-xs font-bold text-white" title="${m.name}">${m.name[0]}</div>`
+        ).join('');
+    } else {
+        membersDiv.classList.add('hidden');
+    }
+    
+    // Due Date
+    const dueDateDiv = document.getElementById('cardDueDate');
+    const dueDateValue = document.getElementById('cardDueDateValue');
+    if (data.due_date) {
+        dueDateDiv.classList.remove('hidden');
+        const dueDate = new Date(data.due_date);
+        const className = data.is_overdue ? 'text-red-400' : (data.due_complete ? 'text-green-400' : 'text-gray-300');
+        dueDateValue.innerHTML = `<span class="${className}">${dueDate.toLocaleDateString()} ${data.due_complete ? '✓' : ''}</span>`;
+    } else {
+        dueDateDiv.classList.add('hidden');
+    }
+    
+    // Checklists
+    const checklistsContainer = document.getElementById('checklistsContainer');
+    checklistsContainer.innerHTML = data.checklists.map(cl => `
+        <div class="mb-4" data-checklist-id="${cl.id}">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-sm font-medium text-gray-400 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                    </svg>
+                    ${cl.name}
+                </h4>
+                <button onclick="deleteChecklist(${cl.id})" class="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+            </div>
+            <div class="space-y-1">
+                ${cl.items.map(item => `
+                    <label class="flex items-center gap-2 p-2 hover:bg-dark-700 rounded cursor-pointer">
+                        <input type="checkbox" ${item.is_complete ? 'checked' : ''} onchange="toggleChecklistItem(${item.id})"
+                            class="w-4 h-4 bg-dark-600 border-dark-500 rounded text-{{ primary_color }}-500">
+                        <span class="${item.is_complete ? 'line-through text-gray-500' : ''}">${item.content}</span>
+                    </label>
+                `).join('')}
+            </div>
+            <button onclick="addChecklistItem(${cl.id})" class="mt-2 text-sm text-gray-400 hover:text-white">+ Add item</button>
+        </div>
+    `).join('');
+    
+    // Comments
+    const commentsContainer = document.getElementById('commentsContainer');
+    commentsContainer.innerHTML = data.comments.map(c => `
+        <div class="flex gap-3">
+            <div class="w-8 h-8 bg-gradient-to-br from-{{ primary_color }}-400 to-{{ primary_color }}-600 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                ${c.user[0]}
+            </div>
+            <div class="flex-1">
+                <div class="flex items-center gap-2">
+                    <span class="font-medium text-sm">${c.user}</span>
+                    <span class="text-xs text-gray-500">${new Date(c.created_at).toLocaleString()}</span>
+                </div>
+                <p class="text-sm text-gray-300 mt-1">${c.content}</p>
+            </div>
+        </div>
+    `).join('');
+    
+    document.getElementById('cardModal').classList.remove('hidden');
+}
+
+function closeCardModal() {
+    document.getElementById('cardModal').classList.add('hidden');
+    currentCardId = null;
+    currentCardData = null;
+}
+
+async function updateCardTitle() {
+    const title = document.getElementById('cardTitle').value;
+    await fetch(`/trello/card/${currentCardId}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title })
+    });
+}
+
+async function updateCardDescription() {
+    const description = document.getElementById('cardDescription').value;
+    await fetch(`/trello/card/${currentCardId}/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description })
+    });
+}
+
+async function addComment() {
+    const content = document.getElementById('newComment').value.trim();
+    if (!content) return;
+    
+    const response = await fetch(`/trello/card/${currentCardId}/comment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+    });
+    
+    if (response.ok) {
+        document.getElementById('newComment').value = '';
+        openCardModal(currentCardId); // Refresh
+    }
+}
+
+async function addChecklist() {
+    const name = prompt('Checklist name:', 'Checklist');
+    if (!name) return;
+    
+    await fetch(`/trello/card/${currentCardId}/checklist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+    });
+    
+    openCardModal(currentCardId);
+}
+
+async function addChecklistItem(checklistId) {
+    const content = prompt('Item:');
+    if (!content) return;
+    
+    await fetch(`/trello/checklist/${checklistId}/item`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+    });
+    
+    openCardModal(currentCardId);
+}
+
+async function toggleChecklistItem(itemId) {
+    await fetch(`/trello/checklist/item/${itemId}/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
+async function deleteChecklist(checklistId) {
+    if (!confirm('Delete this checklist?')) return;
+    
+    await fetch(`/trello/checklist/${checklistId}/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+    
+    openCardModal(currentCardId);
+}
+
+async function archiveCard() {
+    if (!confirm('Archive this card?')) return;
+    
+    await fetch(`/trello/card/${currentCardId}/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+    
+    closeCardModal();
+    location.reload();
+}
+
+async function deleteCard() {
+    if (!confirm('Permanently delete this card?')) return;
+    
+    await fetch(`/trello/card/${currentCardId}/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+    
+    closeCardModal();
+    location.reload();
+}
+
+// Activity Panel
+async function toggleActivityPanel() {
+    const panel = document.getElementById('activityPanel');
+    panel.classList.toggle('hidden');
+    panel.classList.toggle('translate-x-full');
+    
+    if (!panel.classList.contains('hidden')) {
+        const response = await fetch(`/trello/board/${boardId}/activity`);
+        const activities = await response.json();
+        
+        const list = document.getElementById('activityList');
+        list.innerHTML = activities.map(a => `
+            <div class="flex gap-3">
+                <div class="w-8 h-8 bg-gradient-to-br from-{{ primary_color }}-400 to-{{ primary_color }}-600 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                    ${a.user[0]}
+                </div>
+                <div>
+                    <p class="text-sm"><span class="font-medium">${a.user}</span> ${formatAction(a.action)}</p>
+                    <p class="text-xs text-gray-500">${new Date(a.created_at).toLocaleString()}</p>
+                </div>
+            </div>
+        `).join('');
+    }
+}
+
+function formatAction(action) {
+    const actions = {
+        'created_card': 'created a card',
+        'moved_card': 'moved a card',
+        'updated_card': 'updated a card',
+        'archived_card': 'archived a card',
+        'created_list': 'created a list',
+        'renamed_list': 'renamed a list',
+        'archived_list': 'archived a list',
+        'created_board': 'created this board',
+        'updated_board': 'updated the board',
+        'added_comment': 'added a comment'
+    };
+    return actions[action] || action;
+}
+
+// Placeholder functions for dropdowns
+function toggleLabelsDropdown() { alert('Labels dropdown - implement as needed'); }
+function toggleMembersDropdown() { alert('Members dropdown - implement as needed'); }
+function toggleDueDatePicker() { alert('Due date picker - implement as needed'); }
+function toggleCoverPicker() { alert('Cover picker - implement as needed'); }
+function moveCard() { alert('Move card - implement as needed'); }
+
+// Close modal on escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeCardModal();
+    }
+});
+
+// Close modal on backdrop click
+document.getElementById('cardModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('cardModal')) {
+        closeCardModal();
+    }
+});
+</script>
+{% endblock %}
