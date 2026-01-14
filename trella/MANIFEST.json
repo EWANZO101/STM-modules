@@ -1,0 +1,20 @@
+{
+    "name": "trella",
+    "display_name": "Trella Kanban",
+    "version": "1.0.0",
+    "description": "Kanban-style task board with drag-and-drop cards, columns, and project management",
+    "author": "System",
+    "icon": "columns",
+    "url_prefix": "/trella",
+    "nav_order": 50,
+    "required_feature": "trella",
+    "min_app_version": "1.0.0",
+    "permissions": [
+        "trella.view",
+        "trella.create",
+        "trella.edit",
+        "trella.delete"
+    ],
+    "dependencies": [],
+    "changelog": "Initial release with boards, columns, and cards"
+}
